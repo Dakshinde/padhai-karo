@@ -18,7 +18,6 @@ if st.session_state.quiz_data is None:
     with st.form("quiz_config_form"):
         st.header("1. Configure Your Quiz")
         st.session_state.topic_input = st.text_input("What topic do you want a quiz on?", placeholder="e.g., 'Red-Black Trees'")
-        # --- SLIDER REVERTED HERE ---
         num_questions = st.slider("Number of Questions:", min_value=5, max_value=20, value=5)
         quiz_context = st.selectbox(
             "Why are you taking this quiz?",
@@ -82,11 +81,13 @@ if st.session_state.user_answers:
             user_ans = user_answers[i]
             correct_ans = q['correct_answer']
             
+            # --- COLOR CHANGE LOGIC IS HERE ---
             if user_ans.strip() == correct_ans.strip():
-                st.markdown(f"**Your answer:** {user_ans} (Correct)")
+                st.success(f"Your answer: {user_ans} (Correct)")
             else:
-                st.markdown(f"**Your answer:** {user_ans} (Incorrect)")
-                st.markdown(f"**Correct answer:** {correct_ans}")
+                st.error(f"Your answer: {user_ans} (Incorrect)")
+                st.success(f"Correct answer: {correct_ans}")
+            
             st.info(f"**Explanation:** {q['explanation']}")
 
     # --- Generate and Display Learning Path and Resources ---
