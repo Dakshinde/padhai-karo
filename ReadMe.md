@@ -2,7 +2,6 @@
 
 An intelligent learning assistant built with Streamlit and powered by the Gemini API to help engineering students identify weak areas and improve their understanding through personalized quizzes and study plans.
 
-[Image of the Padhai Karo app in action]
 
 ## About The Project
 
@@ -35,3 +34,4 @@ git clone [https://github.com/Dakshinde/padhai-karo.git](https://github.com/Daks
 cd padhai-karo
 
 Made with 🙌 by team Padhai-Karo
+
