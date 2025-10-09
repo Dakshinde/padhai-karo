@@ -1,4 +1,4 @@
-# Padhai Karo - Your Personalized Engineering Tutor 🧠
+# Padhai Karo - Your Personalized Engineering Tutor 
 
 An intelligent learning assistant built with Streamlit and powered by the Gemini API to help engineering students identify weak areas and improve their understanding through personalized quizzes and study plans.
 
@@ -8,7 +8,7 @@ An intelligent learning assistant built with Streamlit and powered by the Gemini
 
 In today’s fast-paced education environment, students often struggle to identify their personal weak areas without continuous performance analysis. Padhai Karo is an intelligent learning assistant that helps bridge the gap between testing and effective learning. It tracks a student's quiz performance, identifies weak topics using AI, and recommends targeted study materials and personalized learning paths that adapt to their needs.
 
-## Core Features ✨
+## Core Features 
 
 * **User Authentication:** Secure sign-up and login using Firebase (Email/Password).
 * **Dynamic Quiz Generation:** Create custom quizzes on any topic with a selectable number of questions and context (e.g., exam prep, viva practice).
@@ -21,7 +21,7 @@ In today’s fast-paced education environment, students often struggle to identi
 ## Tech Stack 🛠️
 
 * **Frontend:** Streamlit
-* **AI Model:** Google Gemini API (`gemini-1.5-flash`)
+* **AI Model:** Google Gemini API
 * **Authentication:** Firebase
 * **Language:** Python
 
@@ -33,3 +33,5 @@ Follow these steps to set up and run the project locally.
 ```bash
 git clone [https://github.com/Dakshinde/padhai-karo.git](https://github.com/Dakshinde/padhai-karo.git)
 cd padhai-karo
+
+Made with 🙌 by team Padhai-Karo
