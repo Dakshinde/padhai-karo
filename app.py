@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.gemini_api import generate_quiz_from_topic, get_study_resources
+from utils.gemini_api import generate_quiz_from_topic, get_study_resources, generate_learning_path
 
 st.set_page_config(
     page_title="Padhai Karo - Personalized Engineering Tutor",
@@ -9,7 +9,7 @@ st.set_page_config(
 st.title("Padhai Karo - Your Personalized Engineering Tutor")
 
 # Initialize session state variables
-for key in ['quiz_data', 'user_answers', 'study_resources', 'topic_input']:
+for key in ['quiz_data', 'user_answers', 'topic_input']:
     if key not in st.session_state:
         st.session_state[key] = None
 
@@ -18,7 +18,8 @@ if st.session_state.quiz_data is None:
     with st.form("quiz_config_form"):
         st.header("1. Configure Your Quiz")
         st.session_state.topic_input = st.text_input("What topic do you want a quiz on?", placeholder="e.g., 'Red-Black Trees'")
-        num_questions = st.slider("Number of Questions:", min_value=3, max_value=15, value=5)
+        # --- SLIDER REVERTED HERE ---
+        num_questions = st.slider("Number of Questions:", min_value=5, max_value=20, value=5)
         quiz_context = st.selectbox(
             "Why are you taking this quiz?",
             ("Quick Review", "Semester Exam Preparation", "Viva / Oral Exam Practice")
@@ -29,7 +30,7 @@ if st.session_state.quiz_data is None:
             if st.session_state.topic_input:
                 with st.spinner("Generating your quiz... This might take a moment!"):
                     st.session_state.quiz_data = generate_quiz_from_topic(st.session_state.topic_input, num_questions, quiz_context)
-                    st.rerun() # Rerun to hide config and show quiz
+                    st.rerun()
             else:
                 st.warning("Please enter a topic to generate a quiz.")
 
@@ -45,9 +46,9 @@ if st.session_state.quiz_data and st.session_state.user_answers is None:
         submitted_answers = st.form_submit_button("Submit Answers")
         if submitted_answers:
             st.session_state.user_answers = temp_user_answers
-            st.rerun() # Rerun to show results
+            st.rerun()
 
-# --- Display the Results and Study Resources ---
+# --- Display the Results and Study Plan ---
 if st.session_state.user_answers:
     st.header("3. Your Results")
 
@@ -57,45 +58,69 @@ if st.session_state.user_answers:
     score = 0
     incorrect_questions = []
     for i, q in enumerate(quiz_data):
-        if user_answers[i] == q['correct_answer']:
+        if user_answers[i].strip() == q['correct_answer'].strip():
             score += 1
         else:
             incorrect_questions.append(q)
     
-    st.success(f"You scored {score} out of {len(quiz_data)}!")
+    score_percent = score / len(quiz_data)
+    score_message = f"You scored {score} out of {len(quiz_data)}!"
+
+    if score_percent >= 0.9:
+        st.success(score_message)
+    elif score_percent >= 0.5:
+        st.warning(score_message)
+    else:
+        st.error(score_message)
+    
     st.divider()
 
     st.subheader("Detailed Feedback")
     for i, q in enumerate(quiz_data):
-        st.markdown(f"**Question {i+1}: {q['question_text']}**")
-        user_ans = user_answers[i]
-        correct_ans = q['correct_answer']
-        
-        if user_ans == correct_ans:
-            st.markdown(f"**Your answer:** {user_ans} (Correct)")
-        else:
-            st.markdown(f"**Your answer:** {user_ans} (Incorrect)")
-            st.markdown(f"**Correct answer:** {correct_ans}")
-        st.info(f"**Explanation:** {q['explanation']}")
-        st.divider()
+        with st.expander(f"Question {i+1}: Review", expanded=(user_answers[i].strip() != q['correct_answer'].strip())):
+            st.markdown(f"**Question:** {q['question_text']}")
+            user_ans = user_answers[i]
+            correct_ans = q['correct_answer']
+            
+            if user_ans.strip() == correct_ans.strip():
+                st.markdown(f"**Your answer:** {user_ans} (Correct)")
+            else:
+                st.markdown(f"**Your answer:** {user_ans} (Incorrect)")
+                st.markdown(f"**Correct answer:** {correct_ans}")
+            st.info(f"**Explanation:** {q['explanation']}")
 
+    # --- Generate and Display Learning Path and Resources ---
     if incorrect_questions:
-        st.subheader("Recommended Study Resources")
-        # To make the list hashable for caching, we convert it to a tuple of tuples
-        incorrect_questions_tuple = tuple(tuple(d.items()) for d in incorrect_questions)
-        resources = get_study_resources(st.session_state.topic_input, incorrect_questions_tuple)
+        st.divider()
+        st.subheader("Your Personalized Study Plan")
         
-        if resources and "study_resources" in resources:
-            for resource in resources["study_resources"]:
-                st.markdown(f"- **Topic:** {resource['sub_topic']}")
-                st.markdown(f"  **Resource:** [Click here to study]({resource['resource_link']})")
-        else:
-            st.warning("Could not retrieve study resources at this time.")
+        incorrect_questions_tuple = tuple(tuple(d.items()) for d in incorrect_questions)
+        
+        with st.spinner("Generating your personalized plan..."):
+            learning_path = generate_learning_path(st.session_state.topic_input, incorrect_questions_tuple)
+            study_resources = get_study_resources(st.session_state.topic_input, incorrect_questions_tuple)
 
-    # --- NEW "START OVER" BUTTON ---
+        # Display Learning Path
+        if learning_path and "learning_path" in learning_path:
+            st.markdown("Here is a step-by-step path to improve your understanding:")
+            for i, step in enumerate(learning_path["learning_path"]):
+                with st.container(border=True):
+                    st.markdown(f"**Step {i+1}: {step['step_title']}**")
+                    st.markdown(f"**Action:** {step['step_details']}")
+                    st.caption(f"**Why:** {step['step_rationale']}")
+        
+        # Display Study Resources
+        if study_resources and "study_plan" in study_resources:
+            st.divider()
+            st.subheader("Recommended Study Resources")
+            for item in study_resources["study_plan"]:
+                with st.container(border=True):
+                    st.markdown(f"**Sub-Topic to Review:** {item['sub_topic']}")
+                    st.markdown(f"**How to Study:** {item['study_strategy']}")
+                    st.link_button("Search for this topic", item['google_search_link'])
+
     st.divider()
     if st.button("Take Another Quiz"):
-        # Reset all relevant session state variables
-        for key in ['quiz_data', 'user_answers', 'study_resources', 'topic_input']:
+        for key in ['quiz_data', 'user_answers', 'topic_input']:
             st.session_state[key] = None
         st.rerun()
