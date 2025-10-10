@@ -3,6 +3,51 @@ import urllib.parse
 import google.generativeai as genai
 import streamlit as st
 
+@st.cache_data
+def extract_topics_from_syllabus(syllabus_text):
+    """
+    Extracts a list of quiz topics from a given syllabus text using the Gemini API.
+    """
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            st.error("GEMINI_API_KEY secret not found!")
+            return None
+        
+        genai.configure(api_key=api_key)
+        
+        prompt = f"""
+        You are an academic assistant. Analyze the following syllabus text and extract a list of main, quiz-worthy topics.
+        Focus on specific, concrete subjects. For example, if you see "Unit 3: Trees and Graphs", you should extract "Trees" and "Graphs".
+
+        Syllabus Text:
+        ---
+        {syllabus_text}
+        ---
+
+        **Rules for Generation:**
+        1. The output MUST be a single, valid JSON object.
+        2. The JSON object must have one key: "topics".
+        3. The value of "topics" should be a list of strings.
+
+        Extract the topics now.
+        """
+
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(prompt)
+        cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
+        data = json.loads(cleaned_response)
+        
+        if "topics" in data and isinstance(data["topics"], list):
+            return data["topics"]
+        else:
+            st.error("Could not parse topics from the syllabus.")
+            return None
+
+    except Exception as e:
+        st.error(f"An error occurred while analyzing the syllabus: {e}")
+        return None
+
 def generate_quiz_from_topic(topic, num_questions, quiz_context):
     """
     Generates a tailored quiz from a given topic, number of questions, and context.
@@ -19,10 +64,58 @@ def generate_quiz_from_topic(topic, num_questions, quiz_context):
         You are an expert quiz creator for engineering students. Your task is to create a professional, multiple-choice quiz on the topic of "{topic}".
         The quiz should contain exactly {num_questions} questions.
         The questions should be tailored for a student who is preparing for a "{quiz_context}".
+        
         **Rules for Generation:**
         1. The output MUST be a single, valid JSON array `[]`.
         2. Each object must contain these exact keys: "question_text", "options", "correct_answer", "explanation".
-        3. **CRITICAL:** The "correct_answer" value MUST be an exact, verbatim copy of one of the strings from the "options" array.
+        3. The "correct_answer" value MUST be an exact, verbatim copy of one of the strings from the "options" array.
+        4. The position of the correct answer in the "options" array MUST be randomized.
+
+        Generate the quiz now.
+        """
+
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(prompt)
+        cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
+        quiz_data = json.loads(cleaned_response)
+        
+        if isinstance(quiz_data, list) and len(quiz_data) == num_questions:
+            return quiz_data
+        else:
+            st.error("The generated quiz does not have the expected format or number of questions.")
+            return None
+
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
+        return None
+
+def generate_quiz_from_context(context_text, num_questions):
+    """
+    Generates a quiz based on the provided text content.
+    """
+    try:
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            st.error("GEMINI_API_KEY secret not found!")
+            return None
+        
+        genai.configure(api_key=api_key)
+        
+        prompt = f"""
+        You are an expert quiz creator. Based ONLY on the following text context, create a multiple-choice quiz with exactly {num_questions} questions.
+        The questions must be answerable using only the information in the provided text.
+
+        CONTEXT:
+        ---
+        {context_text}
+        ---
+
+        **Rules for Generation:**
+        1. The output MUST be a single, valid JSON array `[]`.
+        2. Each object must contain "question_text", "options", "correct_answer", and "explanation".
+        3. The "correct_answer" MUST be an exact copy of one of the "options".
+        4. The position of the correct answer in the "options" array MUST be randomized.
+
         Generate the quiz now.
         """
 
@@ -49,12 +142,9 @@ def get_study_resources(topic, incorrect_questions_tuple):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         if not api_key: return None
-        
         genai.configure(api_key=api_key)
-        
         incorrect_questions = [dict(q) for q in incorrect_questions_tuple]
         mistakes_str = "\n".join([f"- {q['question_text']} (Correct Answer: {q['correct_answer']})" for q in incorrect_questions])
-        
         prompt = f"""
         You are a helpful academic tutor. A student struggled with the topic of "{topic}" and made mistakes on these questions:
         {mistakes_str}
@@ -65,20 +155,15 @@ def get_study_resources(topic, incorrect_questions_tuple):
         3. Each object must contain three keys: "sub_topic", "study_strategy", and "google_search_query".
         Generate the study plan now.
         """
-        
         model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
         plan_data = json.loads(cleaned_response)
-
-        # Post-process to add the full URL
         if "study_plan" in plan_data:
             for item in plan_data["study_plan"]:
                 query = urllib.parse.quote_plus(item["google_search_query"])
                 item["google_search_link"] = f"https://www.google.com/search?q={query}"
-        
         return plan_data
-
     except Exception as e:
         print(f"Could not generate study resources: {e}")
         return None
@@ -91,12 +176,9 @@ def generate_learning_path(topic, incorrect_questions_tuple):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         if not api_key: return None
-        
         genai.configure(api_key=api_key)
-        
         incorrect_questions = [dict(q) for q in incorrect_questions_tuple]
         mistakes_str = "\n".join([f"- {q['question_text']} (Correct Answer: {q['correct_answer']})" for q in incorrect_questions])
-        
         prompt = f"""
         You are an expert academic coach. A student is studying "{topic}" and struggled with concepts revealed by these incorrect quiz answers:
         {mistakes_str}
@@ -107,13 +189,11 @@ def generate_learning_path(topic, incorrect_questions_tuple):
         3. Each step object must contain three keys: "step_title", "step_details", and "step_rationale".
         Generate the learning path now.
         """
-        
         model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
         path_data = json.loads(cleaned_response)
         return path_data
-
     except Exception as e:
         print(f"Could not generate learning path: {e}")
         return None
