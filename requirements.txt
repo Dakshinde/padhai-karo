@@ -4,3 +4,4 @@ Pyrebase4
 PyPDF2
 python-pptx
 python-docx
+google-cloud-vision

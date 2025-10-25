@@ -9,6 +9,8 @@ In today’s fast-paced education environment, students often struggle to identi
 
 ## Core Features
 
+* **Professional PDF Export:** Download module-wise question banks with numbered questions, bold highlights for high-importance questions, and a clean, continuous layout.
+
 ### Multiple Quiz Generation Methods
 * **By Topic:** Generate a quiz by providing any topic name.
 * **From Syllabus:** Paste a course syllabus, and the application will use AI to extract the key topics for you to choose from.
