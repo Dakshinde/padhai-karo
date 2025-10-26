@@ -140,102 +140,167 @@ class NumberedCanvas(pdfcanvas.Canvas):
         if self.footer_text:
             self.drawRightString(width - 36, 15, self.footer_text)
 
-def export_question_bank_pdf(subject_name, question_bank):
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.enums import TA_CENTER
-    from reportlab.lib.units import inch
-    from reportlab.pdfgen import canvas as pdfcanvas
-    import io
-    from datetime import datetime
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from datetime import datetime
+import io
+
+def export_question_bank_pdf(subject_name, question_data):
+    """
+    Generate a professional module-wise question bank PDF (Streamlit-compatible).
+    Returns a BytesIO buffer instead of writing to a file.
+    """
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=36, leftMargin=36,
-        topMargin=72, bottomMargin=54
+    pdf = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=60,
+        rightMargin=60,
+        topMargin=60,
+        bottomMargin=50,
     )
-
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        name="TitleCentered", parent=styles["Title"], alignment=TA_CENTER, spaceAfter=24
-    )
-    module_style = ParagraphStyle(
-        name="ModuleHeading", parent=styles["Heading2"], spaceBefore=12, spaceAfter=12
-    )
-    body_style = ParagraphStyle(
-        name="BodyText", parent=styles["BodyText"], spaceBefore=4, spaceAfter=4
-    )
-    footer_text = "Generated and created by Padhai Karo"
 
     story = []
+    styles = getSampleStyleSheet()
 
-    # Cover page
-    story.append(Spacer(1, 1 * inch))
+    # --- Styles ---
+    title_style = ParagraphStyle(
+        "TitleStyle",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=22,
+        leading=28,
+        alignment=TA_CENTER,
+        spaceAfter=30,
+    )
+
+    subtitle_style = ParagraphStyle(
+        "SubtitleStyle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=14,
+        leading=18,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#555555"),
+        spaceAfter=12,
+    )
+
+    module_title_style = ParagraphStyle(
+        "ModuleTitle",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        leading=22,
+        textColor=colors.HexColor("#1F4E79"),
+        spaceBefore=16,
+        spaceAfter=8,
+    )
+
+    question_style = ParagraphStyle(
+        "QuestionStyle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=11.5,
+        leading=18,
+        alignment=TA_JUSTIFY,
+        spaceBefore=4,
+        spaceAfter=3,
+    )
+
+    top10_title_style = ParagraphStyle(
+        "Top10Title",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=15,
+        leading=22,
+        textColor=colors.HexColor("#9C27B0"),
+        spaceBefore=24,
+        spaceAfter=10,
+    )
+
+    top10_item_style = ParagraphStyle(
+        "Top10Item",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=11.5,
+        leading=18,
+        spaceBefore=2,
+    )
+
+    footer_style = ParagraphStyle(
+        "FooterStyle",
+        parent=styles["Normal"],
+        fontSize=9,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#999999"),
+        spaceBefore=30,
+    )
+
+    # --- 1. Cover Page ---
+    story.append(Spacer(1, 2 * inch))
     story.append(Paragraph("Module-wise Question Bank", title_style))
-    story.append(Paragraph(f"Subject: <b>{subject_name}</b>", styles["Heading2"]))
-    date_str = datetime.now().strftime("%B %d, %Y")
-    story.append(Paragraph(f"Generated on: {date_str}", styles["Normal"]))
+    story.append(Paragraph(f"Subject: {subject_name}", subtitle_style))
+    story.append(
+        Paragraph(f"Generated on: {datetime.now().strftime('%B %d, %Y')}", subtitle_style)
+    )
     story.append(Spacer(1, 0.5 * inch))
-    story.append(Paragraph(footer_text, styles["Normal"]))
+    story.append(Paragraph("Generated and created by <b>Padhai Karo</b>", subtitle_style))
     story.append(PageBreak())
 
-    # Questions by module
-    for module_index, (module_name, questions) in enumerate(question_bank.items(), start=1):
-        story.append(Paragraph(f"Module {module_index}: {module_name}", module_style))
+    # --- 2. Module-wise Questions ---
+    top_repeated = []
 
-        # Sort questions: high importance first, then repetition
-        qs_sorted = sorted(
-            questions,
-            key=lambda q: (0 if q.get("importance", "").lower() == "high" else 1,
-                           -int(q.get("repetition_count", 0)))
-        )
+    for m_index, (module_name, questions) in enumerate(question_data.items(), start=1):
+        story.append(Paragraph(f"Module {m_index} – {module_name}", module_title_style))
+        story.append(Paragraph(f"Total Questions: {len(questions)}", question_style))
+        story.append(Spacer(1, 6))
 
-        for q_index, q in enumerate(qs_sorted, start=1):
+        for q_index, q in enumerate(questions, start=1):
             q_text = q.get("question_text", "").strip()
-            rep = q.get("repetition_count", 0)
-            imp = q.get("importance", "Normal")
+            reps = int(q.get("repetition_count", 1))
 
-            # Serial numbering
-            prefix = f"{q_index}. "
-            if imp.lower() == "high":
-                para_text = f"<b>{prefix}{q_text}</b> — (repeated {rep} times)"
+            # --- Importance Detection ---
+            if reps >= 5:
+                star = "★★ "
+            elif reps >= 3:
+                star = "★ "
             else:
-                para_text = f"• {prefix}{q_text} — (repeated {rep} times)"
-            story.append(Paragraph(para_text, body_style))
+                star = ""
 
-        story.append(Spacer(1, 0.2 * inch))  # space between modules
+            q_num = f"{m_index}.{q_index}"
+            full_text = f"<b>{q_num}.</b> {star}{q_text}"
+            story.append(Paragraph(full_text, question_style))
 
-    # Custom canvas for footer + page numbers
-    class NumberedCanvas(pdfcanvas.Canvas):
-        def __init__(self, *args, footer_text: str = "", **kwargs):
-            super().__init__(*args, **kwargs)
-            self._saved_page_states = []
-            self.footer_text = footer_text
+            # Track for Top 10 section
+            top_repeated.append((q_text, reps, q_num))
 
-        def showPage(self):
-            self._saved_page_states.append(dict(self.__dict__))
-            self._startPage()
+        story.append(Spacer(1, 12))
 
-        def save(self):
-            num_pages = len(self._saved_page_states)
-            for state in self._saved_page_states:
-                self.__dict__.update(state)
-                self.draw_page_number(num_pages)
-                super().showPage()
-            super().save()
+    # --- 3. Top 10 Most Repeated ---
+    story.append(Paragraph("Top 10 Most Repeated (Must-Prepare)", top10_title_style))
+    top_repeated.sort(key=lambda x: x[1], reverse=True)
+    top10 = top_repeated[:10]
 
-        def draw_page_number(self, page_count):
-            width, _ = A4
-            self.setFont("Helvetica", 9)
-            self.drawCentredString(width / 2.0, 15, f"Page {self._pageNumber} of {page_count}")
-            if self.footer_text:
-                self.drawRightString(width - 36, 15, self.footer_text)
+    for rank, (q_text, reps, qnum) in enumerate(top10, start=1):
+        star = "★★" if reps >= 5 else "★" if reps >= 3 else ""
+        line = f"{rank}. {star} {q_text} (<b>{qnum}</b>)"
+        story.append(Paragraph(line, top10_item_style))
 
-    doc.build(story, canvasmaker=lambda *args, **kwargs: NumberedCanvas(*args, footer_text=footer_text, **kwargs))
+    # --- 4. Footer ---
+    story.append(Spacer(1, 30))
+    story.append(
+        Paragraph("Generated by Padhai Karo – AI-powered learning assistant", footer_style)
+    )
+
+    pdf.build(story)
     buffer.seek(0)
     return buffer
+
 
 # ---------------------- Streamlit App Setup ----------------------
 st.set_page_config(page_title="Padhai Karo", layout="centered")
